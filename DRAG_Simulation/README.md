@@ -1,57 +1,58 @@
-# Mitigating Leakage in Transmon Qubits using DRAG
+# Derivative Removal by Adiabatic Gate (DRAG) Simulation
 
-Welcome to the DRAG simulation project! This directory contains a full numerical simulation of a three-level transmon qubit system using QuTiP. The primary goal is to demonstrate why driving a transmon too fast leads to computational errors, and how we can elegantly fix this using a technique called **Derivative Removal by Adiabatic Gate (DRAG)**.
+This directory contains a numerical simulation of single-qubit control in a superconducting transmon using the Quantum Toolbox in Python (QuTiP). It demonstrates the fundamental speed limits of weakly anharmonic qubits and their resolution via the DRAG protocol.
 
-## The Theory: Why do we need DRAG?
+## 1. Introduction
 
-Superconducting transmons are the leading hardware for quantum computers. However, a transmon is not a perfect, ideal two-level qubit. Instead, it is an anharmonic oscillator. This means it has an infinite ladder of energy states ($|0\rangle, |1\rangle, |2\rangle...$), where the energy difference between consecutive levels gets slightly smaller as you go up. 
+Superconducting transmons are the dominant hardware architecture in modern quantum computing. Unlike ideal two-level spin systems, transmons are weakly anharmonic oscillators. The computational basis $\{|0\rangle, |1\rangle\}$ is formed by the lowest two energy eigenstates, but higher-energy states (e.g., $|2\rangle$) are easily accessible. 
 
-The difference between the $|0\rangle \rightarrow |1\rangle$ transition frequency and the $|1\rangle \rightarrow |2\rangle$ transition frequency is known as the **anharmonicity** ($\alpha$). For a typical transmon, $\alpha$ is around $-250 \text{ MHz}$ to $-300 \text{ MHz}$.
+Fast quantum gates are highly desirable to complete operations well within the coherence time of the qubit. However, a short pulse in the time domain corresponds to a broad spectrum in the frequency domain. When the spectral bandwidth of a fast control pulse approaches the anharmonicity of the transmon, it inadvertently drives the $|1\rangle \leftrightarrow |2\rangle$ transition. This loss of probability amplitude into the non-computational $|2\rangle$ state is known as **leakage error**.
 
-To run algorithms quickly and beat decoherence, we want to drive our quantum gates as fast as possible. However, the Fourier transform teaches us a harsh truth: a short pulse in the time domain corresponds to a broad signal in the frequency domain. If we use a very short, fast microwave pulse (e.g., $T = 5 \text{ ns}$) to flip the qubit from $|0\rangle$ to $|1\rangle$, the frequency spread of that pulse becomes so wide that it accidentally excites the $|1\rangle \rightarrow |2\rangle$ transition. This loss of information into the $|2\rangle$ state is called **leakage**, and it is fatal for quantum computation.
+## 2. Theoretical Formulation
 
-**The DRAG Solution:**
-As outlined in the comprehensive review by Krantz et al. [1] and originally proposed by Motzoi et al. [2], we can suppress this leakage by cleverly shaping our microwave pulse. Instead of just sending a standard Gaussian pulse on the in-phase (X) channel, we simultaneously send a second pulse on the out-of-phase (Y) quadrature. 
+### The Transmon Hamiltonian
+In the rotating frame of the microwave drive frequency (assuming resonance with the $|0\rangle \leftrightarrow |1\rangle$ transition, $\omega_d = \omega_{01}$), the drift Hamiltonian for the lowest three levels simplifies to:
+$$ H_0 = \alpha |2\rangle\langle 2| $$
+where $\alpha = \omega_{12} - \omega_{01}$ is the anharmonicity. In this simulation, we set $\alpha = -2\pi \times 250 \text{ MHz}$, a standard value for modern transmons [2].
 
-The shape of this Y-channel pulse is exactly proportional to the **derivative** of the X-channel pulse. Mathematically, the DRAG correction drive is:
+### The Microwave Drive
+The control Hamiltonian driven by a microwave signal can be decomposed into an in-phase (X-quadrature) and an out-of-phase (Y-quadrature) component:
+$$ H_d(t) = \Omega_X(t) H_X + \Omega_Y(t) H_Y $$
+where the coupling operators in the truncated three-level subspace are defined using the bosonic lowering operator $a = |0\rangle\langle1| + \sqrt{2}|1\rangle\langle2|$:
+$$ H_X = \frac{1}{2}(a + a^\dagger) \quad \text{and} \quad H_Y = \frac{i}{2}(a^\dagger - a) $$
 
+For a standard operation (e.g., a $\pi$-pulse), we apply a purely real Gaussian envelope $\Omega_X(t) = \Omega_\pi s(t)$, leaving $\Omega_Y(t) = 0$. While this works for long pulses ($T \gg 1/|\alpha|$), it induces severe leakage for fast gates.
+
+### The DRAG Correction
+To suppress leakage, the DRAG protocol introduces a secondary, simultaneous pulse on the orthogonal Y-quadrature [1]. Using adiabatic perturbation theory, it can be shown that the optimal waveform to eliminate the $|1\rangle \leftrightarrow |2\rangle$ excitation is proportional to the time-derivative of the primary envelope:
 $$ \Omega_Y(t) = -\lambda \frac{\dot{\Omega}_X(t)}{\alpha} $$
+where $\lambda$ is a dimensionless scaling parameter. For a simple Gaussian pulse without detuning corrections, the theoretical optimum is $\lambda = 1$ [3]. This derivative pulse creates destructive interference exactly at the $|1\rangle \leftrightarrow |2\rangle$ transition frequency, dynamically decoupling the computational subspace from the higher energy levels.
 
-where $\lambda$ is a dimensionless scaling parameter (theoretically ideal at $\lambda = 1$). This specific shape creates destructive interference in the frequency domain, perfectly canceling out the unwanted frequency components that cause leakage into $|2\rangle$, allowing us to perform very fast gates with high fidelity.
+## 3. Simulation Implementation
 
-## Simulation Structure
+The Python script (`drag_simulation.py`) implements this physics directly:
 
-The code (`drag_simulation.py`) is structured logically to build up the physics step-by-step:
+1. **Pulse Normalization**: We define a dimensionless Gaussian envelope $s(t)$ and use `scipy.integrate.quad` to strictly enforce the $\pi$-rotation condition: $\Omega_\pi \int_0^T s(t) dt = \pi$.
+2. **Unitary Evolution**: The time-dependent Schrödinger equation is solved using QuTiP's `sesolve`. We pass the Hamiltonian as `[H0, [Hd, drive_coefficient], [HQ, drag_coeff]]`.
+3. **Speed Benchmarking**: We sweep the pulse duration $T$ from $50 \text{ ns}$ down to $2 \text{ ns}$, recording the final population $P_2 = \langle 2 | \psi(T) \rangle \langle \psi(T) | 2 \rangle$ to observe the exponential increase in leakage for bare pulses.
+4. **DRAG Optimization**: For a highly non-adiabatic $5 \text{ ns}$ gate, we sweep the DRAG parameter $\lambda \in [0.5, 1.0]$. The numerical minimization of $P_2$ perfectly confirms the theoretical prediction near $\lambda = 1$.
 
-1. **Pulse Definition & Normalization**: We define a Gaussian envelope for our X-channel drive. We use `scipy.integrate.quad` to numerically integrate the envelope, ensuring we scale the amplitude perfectly to achieve a $\pi$-rotation.
-2. **System Setup**: We construct the 3-level Hamiltonian in the rotating frame using QuTiP (`Qobj`). We define the static anharmonicity, the in-phase drive ($H_d$), and the quadrature drive ($H_Q$).
-3. **Bare Pulse Sweeps**: We simulate the state evolution using `sesolve` across different pulse durations ($T = 50 \text{ ns}$ down to $2 \text{ ns}$) without DRAG, explicitly plotting how faster gates dramatically increase leakage.
-4. **DRAG Implementation**: We analytically differentiate our Gaussian pulse to build the DRAG coefficient function and simulate a fast $5 \text{ ns}$ gate.
-5. **Parameter Optimization**: We sweep the DRAG parameter $\lambda$ around $1.0$ to experimentally find the absolute minimum leakage for our specific pulse shape.
-6. **Final Benchmarking**: We compare the leakage of Bare vs. DRAG pulses across all speeds, demonstrating the massive suppression factor gained by using DRAG.
-
-## Simulation Results
-
-Below is a visual summary of the dynamics when driving the transmon:
+## 4. Results
 
 ![Simulation Results](./drag_simulation_results.png)
 
-As expected from the theory, applying a standard Gaussian pulse at high speeds (e.g., $5 \text{ ns}$) results in significant population ending up in the $|2\rangle$ state. When the DRAG protocol is applied (introducing the derivative-shaped Y-pulse), this leakage is suppressed by orders of magnitude. 
+As demonstrated by the simulation, applying a standard $5 \text{ ns}$ Gaussian pulse results in substantial leakage. By simply turning on the mathematically derived Y-quadrature DRAG drive, the leakage is suppressed by over two orders of magnitude (typically >100x improvement), successfully bypassing the fundamental speed limit of the transmon.
 
-If you run the `drag_simulation.py` script, the final terminal output will calculate the exact **Suppression factor** (how many times smaller the leakage is with DRAG vs without DRAG) across different gate speeds. For a 5ns pulse, DRAG typically reduces leakage by a factor of over 100x!
+## 5. Usage
 
-## How to Run
-
-1. Make sure you have installed the requirements:
-   ```bash
-   pip install -r requirements.txt
-   ```
-2. Run the Python script:
-   ```bash
-   python drag_simulation.py
-   ```
+To run the full simulation and generate the data and plots:
+```bash
+pip install -r requirements.txt
+python drag_simulation.py
+```
 
 ## References
 
-1. P. Krantz, M. Kjaergaard, F. Yan, T. P. Orlando, S. Gustavsson, and W. D. Oliver, *"A Quantum Engineer's Guide to Superconducting Qubits"*, Applied Physics Reviews 6, 021318 (2019). [DOI: 10.1063/1.5089550](https://doi.org/10.1063/1.5089550)
-2. F. Motzoi, J. M. Gambetta, P. Rebentrost, and F. K. Wilhelm, *"Simple Pulses for Elimination of Leakage in Weakly Nonlinear Qubits"*, Physical Review Letters 103, 110501 (2009). [DOI: 10.1103/PhysRevLett.103.110501](https://doi.org/10.1103/PhysRevLett.103.110501)
+1. F. Motzoi, J. M. Gambetta, P. Rebentrost, and F. K. Wilhelm, *"Simple Pulses for Elimination of Leakage in Weakly Nonlinear Qubits"*, Phys. Rev. Lett. **103**, 110501 (2009). [DOI: 10.1103/PhysRevLett.103.110501](https://doi.org/10.1103/PhysRevLett.103.110501)
+2. P. Krantz, M. Kjaergaard, F. Yan, T. P. Orlando, S. Gustavsson, and W. D. Oliver, *"A Quantum Engineer's Guide to Superconducting Qubits"*, Appl. Phys. Rev. **6**, 021318 (2019). [DOI: 10.1063/1.5089550](https://doi.org/10.1063/1.5089550)
+3. J. M. Gambetta, F. Motzoi, S. T. Merkel, and F. K. Wilhelm, *"Analytic control methods for high-fidelity unitary operations in a weakly nonlinear oscillator"*, Phys. Rev. A **83**, 012308 (2011). [DOI: 10.1103/PhysRevA.83.012308](https://doi.org/10.1103/PhysRevA.83.012308)

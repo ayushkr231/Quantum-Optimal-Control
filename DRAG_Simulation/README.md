@@ -6,7 +6,7 @@ This directory contains a numerical simulation of single-qubit control in a supe
 
 Superconducting transmons are the dominant hardware architecture in modern quantum computing. Unlike ideal two-level spin systems, transmons are weakly anharmonic oscillators. The computational basis $\{|0\rangle, |1\rangle\}$ is formed by the lowest two energy eigenstates, but higher-energy states (e.g., $|2\rangle$) are easily accessible. 
 
-Fast quantum gates are highly desirable to complete operations well within the coherence time of the qubit. However, a short pulse in the time domain corresponds to a broad spectrum in the frequency domain. When the spectral bandwidth of a fast control pulse approaches the anharmonicity of the transmon, it inadvertently drives the $|1\rangle \leftrightarrow |2\rangle$ transition. This loss of probability amplitude into the non-computational $|2\rangle$ state is known as **leakage error** [4].
+Fast quantum gates are highly desirable to complete operations well within the coherence time of the qubit. However, a short pulse in the time domain corresponds to a broad spectrum in the frequency domain. When the spectral bandwidth of a fast control pulse approaches the anharmonicity of the transmon, it inadvertently drives the $|1\rangle \leftrightarrow |2\rangle$ transition. This loss of probability amplitude into the non-computational $|2\rangle$ state is known as **leakage error** [1, 2, 4].
 
 ## 2. Theoretical Formulation
 

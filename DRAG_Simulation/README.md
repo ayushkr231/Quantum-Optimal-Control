@@ -50,13 +50,13 @@ The Python script (`drag_simulation.py`) implements this physics directly:
 1. **Pulse Normalization**: We define a dimensionless Gaussian envelope $s(t)$ and use `scipy.integrate.quad` to strictly enforce the $\pi$-rotation condition: $\Omega_\pi \int_0^T s(t) dt = \pi$.
 2. **Unitary Evolution**: The time-dependent Schrödinger equation is solved using QuTiP's `sesolve`. We pass the Hamiltonian as `[H0, [Hd, drive_coefficient], [HQ, drag_coeff]]`.
 3. **Speed Benchmarking**: We sweep the pulse duration $T$ from $50\mathrm{ns}$ down to $2\mathrm{ns}$, recording the final population $P_2 = \langle 2 | \psi(T) \rangle \langle \psi(T) | 2 \rangle$ to observe the exponential increase in leakage for bare pulses.
-4. **DRAG Optimization**: For a highly non-adiabatic $5\mathrm{ns}$ gate, we sweep the DRAG parameter $\lambda \in [0.5, 1.0]$. The numerical minimization of $P_2$ perfectly confirms the theoretical prediction near $\lambda = 1$.
+4. **DRAG Optimization**: For a highly non-adiabatic $5\mathrm{ns}$ gate, we sweep the DRAG parameter $\lambda \in [0.5, 1.0]$. The numerical minimization of $P_2$ reveals an optimal parameter of $\lambda \approx 0.83$, deviating slightly from the simple theoretical prediction of $\lambda=1$ due to higher-order effects and finite pulse truncation.
 
 ## 4. Results
 
 ![Simulation Results](./drag_simulation_results.png)
 
-As demonstrated by the simulation, applying a standard $5\mathrm{ns}$ Gaussian pulse results in substantial leakage. By simply turning on the mathematically derived Y-quadrature DRAG drive, the leakage is suppressed by over two orders of magnitude (typically >100x improvement), successfully bypassing the fundamental speed limit of the transmon.
+As demonstrated by the simulation, applying a standard $5\mathrm{ns}$ Gaussian pulse results in substantial leakage. By simply turning on the mathematically derived Y-quadrature DRAG drive, the leakage is suppressed by a factor of up to 8x, successfully pushing the fundamental speed limit of the transmon.
 
 ## 5. Usage
 
